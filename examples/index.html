@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>HLS</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.0-beta.1.0.canary.10763/dist/hls.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+        var hevcSupport = MediaSource.isTypeSupported('video/mp4;codecs="hev1.1.6.L120.90"') ||
+        MediaSource.isTypeSupported('video/mp4;codecs="hev1.2.4.L120.90"') ||
+        MediaSource.isTypeSupported('video/mp4;codecs="hev1.3.E.L120.90"') ||
+        MediaSource.isTypeSupported('video/mp4;codecs="hev1.4.10.L120.90"')
+            var hlsSupport = Hls.isSupported();
+            document.getElementById('hevc_support').innerText = hevcSupport ? 'Yes' : 'No';
+            document.getElementById('hls_support').innerText = hlsSupport ? 'Yes' : 'No';
+        }
+        )
+    </script>
+</head>
+<body>
+<script>
+    function play(event){
+        var formData = new FormData(event.target.form);
+        var jsonData = {
+            hevc: document.getElementById('hevc_support').innerText === 'Yes',
+        };
+        formData.forEach((value, key) => {
+            if (key === 'force') {
+                jsonData[key] = (value === 'on');
+            } else if (key === 'hwaccel') {
+                jsonData[key] = parseInt(value, 10);
+            } else {
+                jsonData[key] = value;
+            }
+        });
+
+        fetch('/play', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(jsonData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                document.getElementById('message').innerText = data.error;
+                return;
+            }
+            var message = 'Playing,';
+            if(data.transcode){
+                message += "transcoding with "+data.hwAccel;
+            }
+            document.getElementById('message').innerText = message;
+            if (data.format === 'mp4') {
+                var video = document.getElementById('video');
+                video.src = data.url;
+                video.play();
+            }else{
+                var video = document.getElementById('video');
+                var hls = new Hls();
+                hls.attachMedia(video);
+                hls.loadSource(data.url);
+                video.play();
+            }
+
+            document.getElementById('message').innerText = 'Playing...';
+        })
+        .catch(error => {
+            document.getElementById('message').innerText = 'Error: ' + error;
+        });
+    }
+
+</script>
+<center>
+
+    <h1>Video On Demand</h1>
+    <div>
+        <label>HEVC Support:</label><span id="hevc_support"></span>
+    </div>
+    <div>
+        <label>HLS Support:</label><span id="hls_support"></span>
+    </div>
+
+    <p id="message"></p>
+    <form>
+        <div>
+        <label>Path</label>
+        <input type="text" name="path" placeholder="Path to video file" required>
+        </div>
+        <div>
+        <label>Hardware Accel</label>
+        <select name="hwaccel">
+            <option value="0">Auto</option>
+            <option value="5">VideoToolBox</option>
+            <option value="1">NVENC</option>
+            <option value="2">QSV</option>
+            <option value="7">AMF</option>
+            <option value="-1">None</option>
+        </select>
+        </div>
+        <label>Format</label>
+        <select name="format">
+            <option value="hls">HLS</option>
+            <option value="mp4">MP4</option>
+        </select>
+        </div>
+        <div>
+        <label>Force Transcode</label>
+        <input type="checkbox" name="force"/>
+        </div>
+        <div>
+        <input type="button" value="Play" onclick="play(event)">
+        </div>
+    </form>
+    <video id="video" controls width="1080" height="720"></video>
+</center>
+
+
+
+<select id="qualitySelect"></select>
+
+</body>
+</html>
